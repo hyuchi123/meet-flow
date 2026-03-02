@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Meet Flow
 
-## Getting Started
+## Project Description
 
-First, run the development server:
+Meet Flow is a meeting availability finder built with Next.js. Add members, mark their free time on a weekly grid (Mon–Fri, 9–17), and see overlapping slots so you can pick meeting times that work for everyone.
+
+## Project Startup
+
+### Prerequisites
+
+- Node.js (v18+ recommended)
+- npm, yarn, pnpm, or bun
+
+### Install & run
 
 ```bash
+# Install dependencies
+npm install
+# or: yarn | pnpm install | bun install
+
+# Start development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# or: yarn dev | pnpm dev | bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Other scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `npm run build` — production build
+- `npm run start` — run production server
+- `npm run lint` — run ESLint
 
-## Learn More
+## Contributing
 
-To learn more about Next.js, take a look at the following resources:
+### Branch practices
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Work on **feature branches**, not directly on `main`.
+- Branch names: `feat/<short-description>` or `fix/<short-description>` (e.g. `feature/add-export`, `fix/calendar-timezone`).
+- Keep branches short-lived and up to date with `main` (rebase or merge as agreed).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Commit practices
 
-## Deploy on Vercel
+- Write **clear, present-tense** messages (e.g. "Add export to CSV", "Fix slot highlight on mobile").
+- Prefer one logical change per commit.
+- Reference issues/PRs when relevant (e.g. "Fix #12: overlapping slots on narrow screens").
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This project uses [Next.js](https://nextjs.org) and was bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
