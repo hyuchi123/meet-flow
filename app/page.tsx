@@ -20,11 +20,20 @@ import { Plus, Users, Calendar, User, CalendarCheck } from "lucide-react";
 
 type TimeSlot = string; // "day-hour", e.g. "0-9" = Monday 9am
 
+type Priority = "urgent" | "normal" | "low";
+
 type Member = {
   id: string;
   name: string;
   color: string;
   availability: TimeSlot[];
+};
+
+type Meeting = {
+  id: string;
+  title: string;
+  slot: TimeSlot;
+  priority: Priority;
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -40,6 +49,39 @@ const COLORS = [
   "bg-yellow-500",
   "bg-cyan-500",
 ];
+
+const PRIORITY_CONFIG: Record<
+  Priority,
+  { label: string; cellClass: string; badgeClass: string; dotClass: string; btnClass: string }
+> = {
+  urgent: {
+    label: "緊急",
+    cellClass: "bg-red-400 border-red-400",
+    badgeClass:
+      "bg-red-100 text-red-700 border border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800",
+    dotClass: "bg-red-500",
+    btnClass:
+      "border-red-300 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
+  },
+  normal: {
+    label: "一般",
+    cellClass: "bg-blue-400 border-blue-400",
+    badgeClass:
+      "bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800",
+    dotClass: "bg-blue-500",
+    btnClass:
+      "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
+  },
+  low: {
+    label: "低優先",
+    cellClass: "bg-slate-400 border-slate-400",
+    badgeClass:
+      "bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600",
+    dotClass: "bg-slate-400",
+    btnClass:
+      "border-slate-300 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300",
+  },
+};
 
 const slot = (day: number, hour: number): TimeSlot => `${day}-${hour}`;
 
@@ -96,10 +138,12 @@ function ScheduleGrid({
   availability,
   onBatchToggle,
   emerald = false,
+  slotColors,
 }: {
   availability: TimeSlot[];
   onBatchToggle?: (slots: TimeSlot[], fill: boolean) => void;
   emerald?: boolean;
+  slotColors?: Record<TimeSlot, string>;
 }) {
   const [drag, setDrag] = useState<DragState | null>(null);
   const dragging = useRef(false);
@@ -156,6 +200,7 @@ function ScheduleGrid({
                 const s = slot(d, h);
                 const active = availability.includes(s);
                 const inRect = inDragRect(d, hi);
+                const priorityClass = slotColors?.[s];
 
                 let cellClass: string;
                 if (inRect) {
@@ -163,7 +208,10 @@ function ScheduleGrid({
                   cellClass = drag!.filling
                     ? "bg-primary/60 border-primary/60"
                     : "bg-muted border-border opacity-40";
-                } else if (active) {
+                } else if (priorityClass) {
+                  cellClass = priorityClass;
+                }
+                else if (active) {
                   cellClass = emerald
                     ? "bg-emerald-400 border-emerald-400"
                     : "bg-primary border-primary";
@@ -209,7 +257,7 @@ function ScheduleGrid({
 
 function Legend({ items }: { items: { color: string; label: string }[] }) {
   return (
-    <div className="flex gap-4 mb-5 text-xs text-muted-foreground">
+    <div className="flex flex-wrap gap-4 mb-5 text-xs text-muted-foreground">
       {items.map((item) => (
         <div key={item.label} className="flex items-center gap-1.5">
           <div className={`w-3 h-3 rounded ${item.color}`} />
@@ -217,6 +265,20 @@ function Legend({ items }: { items: { color: string; label: string }[] }) {
         </div>
       ))}
     </div>
+  );
+}
+
+// ─── Priority Badge ───────────────────────────────────────────────────────────
+
+function PriorityBadge({ priority }: { priority: Priority }) {
+  const cfg = PRIORITY_CONFIG[priority];
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${cfg.badgeClass}`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dotClass}`} />
+      {cfg.label}
+    </span>
   );
 }
 
@@ -228,6 +290,13 @@ export default function MeetFlow() {
   const [open, setOpen] = useState(false);
   const [viewId, setViewId] = useState("xiao-liang");
 
+  // Meeting state
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [meetingOpen, setMeetingOpen] = useState(false);
+  const [newMeetingTitle, setNewMeetingTitle] = useState("");
+  const [newMeetingSlot, setNewMeetingSlot] = useState<TimeSlot | null>(null);
+  const [newMeetingPriority, setNewMeetingPriority] = useState<Priority>("normal");
+
   const me = members.find((m) => m.id === "me")!;
   const others = members.filter((m) => m.id !== "me");
   const viewing = members.find((m) => m.id === viewId) ?? others[0];
@@ -238,6 +307,12 @@ export default function MeetFlow() {
     ).map((h) => slot(d, h))
   );
 
+ 
+  // Map from slot → priority cell class for scheduled meetings
+  const meetingSlotColors: Record<TimeSlot, string> = {};
+  for (const meeting of meetings) {
+    meetingSlotColors[meeting.slot] = PRIORITY_CONFIG[meeting.priority].cellClass;
+  }
   function batchToggleMySlots(slots: TimeSlot[], fill: boolean) {
     setMembers((prev) =>
       prev.map((m) =>
@@ -266,6 +341,27 @@ export default function MeetFlow() {
     setMembers((prev) => [...prev, newMember]);
     setNewName("");
     setOpen(false);
+  }
+
+  function addMeeting() {
+    const title = newMeetingTitle.trim();
+    if (!title || !newMeetingSlot) return;
+    const meeting: Meeting = {
+      id: `meeting-${Date.now()}`,
+      title,
+      slot: newMeetingSlot,
+      priority: newMeetingPriority,
+    };
+    setMeetings((prev) => [...prev, meeting]);
+    setNewMeetingTitle("");
+    setNewMeetingSlot(null);
+    setNewMeetingPriority("normal");
+    setMeetingOpen(false);
+  }
+
+  function slotLabel(s: TimeSlot) {
+    const [d, h] = s.split("-").map(Number);
+    return `${DAYS[d]} ${h}:00–${h + 1}:00`;
   }
 
   return (
@@ -453,17 +549,107 @@ export default function MeetFlow() {
 
           {/* ── Tab 4: Common Availability ── */}
           <TabsContent value="common">
-            <div className="mb-5">
-              <h2 className="text-base font-semibold">共同空閒時間</h2>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                所有 {members.length} 位成員都空閒的時段
-              </p>
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="text-base font-semibold">共同空閒時間</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  所有 {members.length} 位成員都空閒的時段
+                </p>
+              </div>
+
+              {/* ── Add Meeting Dialog ── */}
+              <Dialog open={meetingOpen} onOpenChange={setMeetingOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    className="gap-1.5"
+                    disabled={commonSlots.length === 0}
+                  >
+                    <Plus className="w-4 h-4" />
+                    建立會議
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-sm">
+                  <DialogHeader>
+                    <DialogTitle>建立會議</DialogTitle>
+                  </DialogHeader>
+                  <div className="flex flex-col gap-4 mt-2">
+                    {/* Title */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium">會議名稱</label>
+                      <Input
+                        placeholder="輸入會議名稱"
+                        value={newMeetingTitle}
+                        onChange={(e) => setNewMeetingTitle(e.target.value)}
+                        autoFocus
+                      />
+                    </div>
+
+                    {/* Priority */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium">優先級</label>
+                      <div className="flex gap-2">
+                        {(["urgent", "normal", "low"] as Priority[]).map((p) => {
+                          const cfg = PRIORITY_CONFIG[p];
+                          const selected = newMeetingPriority === p;
+                          return (
+                            <button
+                              key={p}
+                              onClick={() => setNewMeetingPriority(p)}
+                              className={`flex-1 flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium transition-colors ${
+                                selected
+                                  ? cfg.btnClass + " ring-2 ring-offset-1 " + (p === "urgent" ? "ring-red-400" : p === "normal" ? "ring-blue-400" : "ring-slate-400")
+                                  : "border-border bg-background text-muted-foreground hover:bg-muted"
+                              }`}
+                            >
+                              <span className={`w-2 h-2 rounded-full ${cfg.dotClass}`} />
+                              {cfg.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Time Slot */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-sm font-medium">選擇時段</label>
+                      <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
+                        {commonSlots.map((s) => (
+                          <button
+                            key={s}
+                            onClick={() =>
+                              setNewMeetingSlot(newMeetingSlot === s ? null : s)
+                            }
+                            className={`rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
+                              newMeetingSlot === s
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "border-border bg-background text-foreground hover:bg-muted"
+                            }`}
+                          >
+                            {slotLabel(s)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={addMeeting}
+                      disabled={!newMeetingTitle.trim() || !newMeetingSlot}
+                    >
+                      確認建立
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
 
             <Card>
               <CardContent className="pt-6">
                 <Legend
                   items={[
+                    { color: "bg-red-400", label: "緊急會議" },
+                    { color: "bg-blue-400", label: "一般會議" },
+                    { color: "bg-slate-400", label: "低優先會議" },
                     { color: "bg-emerald-400", label: "共同空閒" },
                     { color: "bg-muted border border-border", label: "非共同" },
                   ]}
@@ -473,12 +659,54 @@ export default function MeetFlow() {
                     目前沒有共同空閒時段
                   </p>
                 ) : (
-                  <ScheduleGrid availability={commonSlots} emerald />
+                  <ScheduleGrid
+                    availability={commonSlots}
+                    emerald
+                    slotColors={meetingSlotColors}
+                  />
                 )}
               </CardContent>
             </Card>
 
-            {commonSlots.length > 0 && (
+            {/* ── Scheduled Meetings ── */}
+            {meetings.length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-sm font-semibold mb-3">已排定會議</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {meetings.map((meeting) => {
+                    const cfg = PRIORITY_CONFIG[meeting.priority];
+                    return (
+                      <Card
+                        key={meeting.id}
+                        className={`border-l-4 ${
+                          meeting.priority === "urgent"
+                            ? "border-l-red-400"
+                            : meeting.priority === "normal"
+                            ? "border-l-blue-400"
+                            : "border-l-slate-400"
+                        }`}
+                      >
+                        <CardContent className="p-4 flex items-start gap-3">
+                          <div className={`mt-0.5 w-2.5 h-2.5 rounded-full shrink-0 ${cfg.dotClass}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">
+                              {meeting.title}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {slotLabel(meeting.slot)}
+                            </p>
+                          </div>
+                          <PriorityBadge priority={meeting.priority} />
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Common slot chips (shown when no meetings yet or always) */}
+            {commonSlots.length > 0 && meetings.length === 0 && (
               <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                 {commonSlots.map((s) => {
                   const [d, h] = s.split("-").map(Number);
